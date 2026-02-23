@@ -1,12 +1,67 @@
 import streamlit as st
 from openai import OpenAI
 
+
+def build_prompt_mode(mode_name: str) -> tuple[str, str, int]:
+    if mode_name == "Low-token":
+        return (
+            "You are a concise creator strategy consultant.",
+            "Use compact bullet points, zero fluff, no repetition, and keep deterministic formatting.",
+            700,
+        )
+    if mode_name == "SKIPE":
+        return (
+            "You are a UX-grade structured output engine and creator strategy consultant.",
+            (
+                "Classify user intent first, then produce a shippable deliverable using: "
+                "Intent Lock -> Information Architecture -> Structured Blocks -> Self-check. "
+                "Rules: no repetition, no generic fluff, strict format fidelity, high signal density."
+            ),
+            1200,
+        )
+    return (
+        "You are a top-tier creator strategy consultant.",
+        "Return practical, no-fluff plans that can be executed immediately.",
+        1400,
+    )
+
+
+def run_self_check(result_text: str) -> dict[str, str]:
+    lines = [line.strip() for line in result_text.splitlines() if line.strip()]
+    unique_lines = set(lines)
+
+    no_repetition = "pass" if len(lines) == len(unique_lines) else "warn"
+
+    required_markers = [
+        "IG Bio",
+        "MVP",
+        "短片",
+        "Bio Link",
+        "風險",
+        "結論",
+    ]
+    format_fidelity = "pass" if all(marker in result_text for marker in required_markers) else "warn"
+
+    avg_line_len = sum(len(line) for line in lines) / len(lines) if lines else 0
+    signal_density = "pass" if 10 <= avg_line_len <= 120 else "warn"
+
+    empty_ratio = result_text.count("\n\n\n")
+    low_noise = "pass" if empty_ratio == 0 else "warn"
+
+    return {
+        "No Repetition": no_repetition,
+        "Format Fidelity": format_fidelity,
+        "Signal Density": signal_density,
+        "Reduced Noise": low_noise,
+    }
+
+
 st.set_page_config(page_title="Creator Strategy Assistant", page_icon="💡", layout="wide")
 
 st.title("💡 Creator Strategy Assistant")
 st.write(
     "Build an IG bio and a focused 4-month MVP content plan for Korea-study/work creators. "
-    "Use **Quick Planner** for a structured output, or **Chat** for free-form conversations."
+    "Use **Quick Planner** for structured output, **SKIPE** for deterministic blocks, or **Chat** for free-form conversations."
 )
 
 openai_api_key = st.text_input("OpenAI API Key", type="password")
@@ -21,6 +76,12 @@ mode = st.radio("Mode", ["Quick Planner", "Chat"], horizontal=True)
 if mode == "Quick Planner":
     st.subheader("IG Bio + MVP Planner")
     st.caption("Fill only what you know. Leave unknown fields blank.")
+
+    output_mode = st.selectbox(
+        "Output mode",
+        ["Standard", "Low-token", "SKIPE"],
+        help="Standard = full detail, Low-token = compact output, SKIPE = deterministic structured blocks.",
+    )
 
     with st.form("planner_form"):
         col1, col2 = st.columns(2)
@@ -63,10 +124,7 @@ if mode == "Quick Planner":
         submitted = st.form_submit_button("Generate Bio + MVP")
 
     if submitted:
-        system_prompt = (
-            "You are a top-tier creator strategy consultant. "
-            "Return practical, no-fluff plans that can be executed immediately."
-        )
+        system_role, system_rules, max_tokens = build_prompt_mode(output_mode)
 
         user_prompt = f"""
 請依照以下資訊，產出一份可直接執行的策略稿：
@@ -92,6 +150,9 @@ if mode == "Quick Planner":
 6) 風險與修正（常見 5 個跑偏點 + 修正方法）
 7) 一句話結論（讓創作者不再搖擺）
 
+模式要求：{output_mode}
+{system_rules}
+
 請務必：
 - 避免空泛鼓勵
 - 用可執行、可驗證的語言
@@ -102,9 +163,10 @@ if mode == "Quick Planner":
             stream = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": system_prompt},
+                    {"role": "system", "content": system_role},
                     {"role": "user", "content": user_prompt},
                 ],
+                max_completion_tokens=max_tokens,
                 stream=True,
             )
             result = st.write_stream(stream)
@@ -115,6 +177,12 @@ if mode == "Quick Planner":
             file_name="ig_bio_mvp_plan.md",
             mime="text/markdown",
         )
+
+        st.markdown("### Self-check")
+        check_results = run_self_check(result)
+        for rule_name, status in check_results.items():
+            icon = "✅" if status == "pass" else "⚠️"
+            st.write(f"{icon} {rule_name}: {status}")
 
 else:
     st.subheader("Free-form Chat")
