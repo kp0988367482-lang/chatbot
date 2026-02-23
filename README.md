@@ -1,19 +1,22 @@
-# 💬 Chatbot template
+# 💡 Creator Strategy Assistant
 
-A simple Streamlit app that shows how to build a chatbot using OpenAI's GPT-3.5.
+A Streamlit app powered by OpenAI for:
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://chatbot-template.streamlit.app/)
+- **Quick Planner**: generate IG Bio + 4-week MVP content strategy.
+- **Chat**: free-form creator strategy conversations.
 
-### How to run it on your own machine
+## Run locally
 
-1. Install the requirements
+1. Install dependencies
 
-   ```
-   $ pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-2. Run the app
+2. Run app
 
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+```bash
+streamlit run streamlit_app.py
+```
+
+3. Open the local URL shown in terminal and paste your OpenAI API key.
