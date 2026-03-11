@@ -58,6 +58,26 @@ def run_self_check(result_text: str, preferred_language: str) -> dict[str, str]:
     }
 
 
+def build_funnel_blueprint(framework_mode: str) -> str:
+    if framework_mode == "SEOULMATE 31 強化版":
+        return (
+            "請以 Problem -> Compare -> Case -> Decision Tool -> Service 的漏斗生成。\n"
+            "首頁必須以問題切入（Problem Hook），並包含：\n"
+            "1) Hero with 3 choices（留學/打工度假/做生意）\n"
+            "2) 問題卡片區\n"
+            "3) 熱門比較區\n"
+            "4) 真實案例區\n"
+            "5) 決策工具區\n"
+            "6) 服務入口區\n"
+            "網站 IA 請用：Home / Problems / Compare / Guides / Cases / Tools / Services"
+        )
+
+    return (
+        "請以 Problem -> Compare -> Decision -> Action 漏斗生成。\n"
+        "輸出需包含：問題入口、比較模組、決策工具、行動轉化。"
+    )
+
+
 def build_user_prompt(
     creator_identity: str,
     core_topics: str,
@@ -70,7 +90,10 @@ def build_user_prompt(
     system_rules: str,
     reference_urls: str,
     reference_notes: str,
+    framework_mode: str,
 ) -> str:
+    funnel_blueprint = build_funnel_blueprint(framework_mode)
+
     base_prompt = f"""
 請依照以下資訊，產出一份可直接執行的策略稿：
 
@@ -82,6 +105,11 @@ def build_user_prompt(
 - Content style: {content_style}
 - Preferred language: {preferred_language}
 - Constraints: {constraints}
+
+[策略框架]
+- Funnel framework: {framework_mode}
+- Funnel rule:
+{funnel_blueprint}
 
 [外部參考 URL（需先閱讀）]
 {reference_urls or "(無)"}
@@ -100,6 +128,7 @@ def build_user_prompt(
 5) Bio Link 文案（最小可行：標題、主 CTA、私訊關鍵字）
 6) 風險與修正（常見 5 個跑偏點 + 修正方法）
 7) 一句話結論（讓創作者不再搖擺）
+8) 網站資訊架構（IA）與首頁區塊草圖（依漏斗）
 
 模式要求：{output_mode}
 {system_rules}
@@ -120,6 +149,7 @@ B) Information Architecture (compact bullets)
 C) Shippable Deliverable Blocks (ready-to-paste)
 D) Self-check Summary (pass/warn with one-line reason)
 E) URL Confirmation Block（已確認 / 待確認）
+F) Funnel Block（Problem / Compare / Decision / Action）
 """
 
     return base_prompt
@@ -155,6 +185,12 @@ if mode == "Quick Planner":
         "輸出模式",
         ["Standard", "Low-token", "SKIPE"],
         help="Standard：完整細節；Low-token：精簡高密度；SKIPE：固定結構區塊。",
+    )
+
+    framework_mode = st.selectbox(
+        "漏斗框架",
+        ["Problem → Compare → Decision → Action", "SEOULMATE 31 強化版"],
+        help="選擇你要的轉化路徑，會直接影響輸出結構與首頁 IA。",
     )
 
     with st.form("planner_form"):
@@ -227,6 +263,7 @@ if mode == "Quick Planner":
                 system_rules=system_rules,
                 reference_urls=reference_urls,
                 reference_notes=reference_notes,
+                framework_mode=framework_mode,
             )
 
             try:
