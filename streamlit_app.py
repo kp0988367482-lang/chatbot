@@ -6,7 +6,7 @@ def build_prompt_mode(mode_name: str) -> tuple[str, str, int]:
     if mode_name == "Low-token":
         return (
             "You are a concise creator strategy consultant.",
-            "Use compact bullet points, zero fluff, no repetition, and keep deterministic formatting.",
+            "Use compact bullet points, zero fluff, no repetition, and deterministic formatting.",
             700,
         )
     if mode_name == "SKIPE":
@@ -26,27 +26,29 @@ def build_prompt_mode(mode_name: str) -> tuple[str, str, int]:
     )
 
 
-def run_self_check(result_text: str) -> dict[str, str]:
+def build_required_markers(preferred_language: str) -> list[str]:
+    if preferred_language == "English":
+        return ["IG Bio", "MVP", "short", "Bio Link", "risk", "conclusion"]
+    if preferred_language == "한국어":
+        return ["IG", "MVP", "숏폼", "Bio Link", "리스크", "결론"]
+    return ["IG Bio", "MVP", "短片", "Bio Link", "風險", "結論"]
+
+
+def run_self_check(result_text: str, preferred_language: str) -> dict[str, str]:
     lines = [line.strip() for line in result_text.splitlines() if line.strip()]
     unique_lines = set(lines)
 
     no_repetition = "pass" if len(lines) == len(unique_lines) else "warn"
 
-    required_markers = [
-        "IG Bio",
-        "MVP",
-        "短片",
-        "Bio Link",
-        "風險",
-        "結論",
-    ]
-    format_fidelity = "pass" if all(marker in result_text for marker in required_markers) else "warn"
+    normalized_text = result_text.lower()
+    required_markers = build_required_markers(preferred_language)
+    format_fidelity = "pass" if all(marker.lower() in normalized_text for marker in required_markers) else "warn"
 
     avg_line_len = sum(len(line) for line in lines) / len(lines) if lines else 0
     signal_density = "pass" if 10 <= avg_line_len <= 120 else "warn"
 
-    empty_ratio = result_text.count("\n\n\n")
-    low_noise = "pass" if empty_ratio == 0 else "warn"
+    excessive_blank_lines = result_text.count("\n\n\n")
+    low_noise = "pass" if excessive_blank_lines == 0 else "warn"
 
     return {
         "No Repetition": no_repetition,
@@ -54,6 +56,63 @@ def run_self_check(result_text: str) -> dict[str, str]:
         "Signal Density": signal_density,
         "Reduced Noise": low_noise,
     }
+
+
+def build_user_prompt(
+    creator_identity: str,
+    core_topics: str,
+    target_audience: str,
+    revenue_goal: str,
+    content_style: str,
+    preferred_language: str,
+    constraints: str,
+    output_mode: str,
+    system_rules: str,
+) -> str:
+    base_prompt = f"""
+請依照以下資訊，產出一份可直接執行的策略稿：
+
+[輸入資料]
+- Creator identity: {creator_identity}
+- Core topics: {core_topics}
+- Target audience: {target_audience}
+- Revenue goal: {revenue_goal}
+- Content style: {content_style}
+- Preferred language: {preferred_language}
+- Constraints: {constraints}
+
+[輸出格式要求]
+1) 最終 IG Bio（3 個版本：平衡版 / 強勢版 / 極簡版）
+2) 思維轉向（Before → After，最多 6 點）
+3) MVP 計畫（4 週）
+   - 每週目標
+   - 每週內容主題與短片數量
+   - 每週唯一 CTA
+4) 10 支短片題目（依「最先測爆款」排序）
+5) Bio Link 文案（最小可行：標題、主 CTA、私訊關鍵字）
+6) 風險與修正（常見 5 個跑偏點 + 修正方法）
+7) 一句話結論（讓創作者不再搖擺）
+
+模式要求：{output_mode}
+{system_rules}
+
+請務必：
+- 避免空泛鼓勵
+- 用可執行、可驗證的語言
+- 若資訊不足，做合理假設並標註
+"""
+
+    if output_mode == "SKIPE":
+        base_prompt += """
+
+[SKIPE Output Blocks]
+A) Intent Lock (1-2 lines)
+B) Information Architecture (compact bullets)
+C) Shippable Deliverable Blocks (ready-to-paste)
+D) Self-check Summary (pass/warn with one-line reason)
+"""
+
+    return base_prompt
 
 
 st.set_page_config(page_title="Creator Strategy Assistant", page_icon="💡", layout="wide")
@@ -72,6 +131,11 @@ if not openai_api_key:
 
 client = OpenAI(api_key=openai_api_key)
 mode = st.radio("Mode", ["Quick Planner", "Chat"], horizontal=True)
+
+if "last_result" not in st.session_state:
+    st.session_state.last_result = ""
+if "last_language" not in st.session_state:
+    st.session_state.last_language = "繁體中文"
 
 if mode == "Quick Planner":
     st.subheader("IG Bio + MVP Planner")
@@ -124,62 +188,49 @@ if mode == "Quick Planner":
         submitted = st.form_submit_button("Generate Bio + MVP")
 
     if submitted:
-        system_role, system_rules, max_tokens = build_prompt_mode(output_mode)
-
-        user_prompt = f"""
-請依照以下資訊，產出一份可直接執行的策略稿：
-
-[輸入資料]
-- Creator identity: {creator_identity}
-- Core topics: {core_topics}
-- Target audience: {target_audience}
-- Revenue goal: {revenue_goal}
-- Content style: {content_style}
-- Preferred language: {preferred_language}
-- Constraints: {constraints}
-
-[輸出格式要求]
-1) 最終 IG Bio（3 個版本：平衡版 / 強勢版 / 極簡版）
-2) 思維轉向（Before → After，最多 6 點）
-3) MVP 計畫（4 週）
-   - 每週目標
-   - 每週內容主題與短片數量
-   - 每週唯一 CTA
-4) 10 支短片題目（依「最先測爆款」排序）
-5) Bio Link 文案（最小可行：標題、主 CTA、私訊關鍵字）
-6) 風險與修正（常見 5 個跑偏點 + 修正方法）
-7) 一句話結論（讓創作者不再搖擺）
-
-模式要求：{output_mode}
-{system_rules}
-
-請務必：
-- 避免空泛鼓勵
-- 用可執行、可驗證的語言
-- 若資訊不足，做合理假設並標註
-"""
-
-        with st.spinner("Generating your strategy..."):
-            stream = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_role},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_completion_tokens=max_tokens,
-                stream=True,
+        if not core_topics.strip():
+            st.warning("Please provide at least Core topics so the output can be specific.")
+        else:
+            system_role, system_rules, max_tokens = build_prompt_mode(output_mode)
+            user_prompt = build_user_prompt(
+                creator_identity=creator_identity,
+                core_topics=core_topics,
+                target_audience=target_audience,
+                revenue_goal=revenue_goal,
+                content_style=content_style,
+                preferred_language=preferred_language,
+                constraints=constraints,
+                output_mode=output_mode,
+                system_rules=system_rules,
             )
-            result = st.write_stream(stream)
 
+            try:
+                with st.spinner("Generating your strategy..."):
+                    stream = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": system_role},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        max_tokens=max_tokens,
+                        stream=True,
+                    )
+                    result = st.write_stream(stream)
+                    st.session_state.last_result = result
+                    st.session_state.last_language = preferred_language
+            except Exception as error:
+                st.error(f"Generation failed: {error}")
+
+    if st.session_state.last_result:
         st.download_button(
             "Download result (.md)",
-            data=result,
+            data=st.session_state.last_result,
             file_name="ig_bio_mvp_plan.md",
             mime="text/markdown",
         )
 
         st.markdown("### Self-check")
-        check_results = run_self_check(result)
+        check_results = run_self_check(st.session_state.last_result, st.session_state.last_language)
         for rule_name, status in check_results.items():
             icon = "✅" if status == "pass" else "⚠️"
             st.write(f"{icon} {rule_name}: {status}")

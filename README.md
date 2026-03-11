@@ -8,8 +8,9 @@ A Streamlit app powered by OpenAI for creator strategy workflows.
 - **Output modes**:
   - **Standard**: fuller structured strategy output.
   - **Low-token**: compact, high-signal output.
-  - **SKIPE**: deterministic block-style output (intent → IA → deliverable).
-- **Self-check panel**: quick output QA for repetition, format fidelity, and signal density.
+  - **SKIPE**: deterministic block-style output (Intent Lock → IA → Deliverable).
+- **Self-check panel**: quick output QA for repetition, format fidelity, signal density, and noise.
+- **Result persistence in session**: download and self-check remain available after reruns.
 - **Chat**: free-form creator strategy conversations.
 
 ## Run locally
