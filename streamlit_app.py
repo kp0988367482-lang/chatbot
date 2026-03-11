@@ -68,6 +68,8 @@ def build_user_prompt(
     constraints: str,
     output_mode: str,
     system_rules: str,
+    reference_urls: str,
+    reference_notes: str,
 ) -> str:
     base_prompt = f"""
 請依照以下資訊，產出一份可直接執行的策略稿：
@@ -80,6 +82,12 @@ def build_user_prompt(
 - Content style: {content_style}
 - Preferred language: {preferred_language}
 - Constraints: {constraints}
+
+[外部參考 URL（需先閱讀）]
+{reference_urls or "(無)"}
+
+[URL 重點摘錄（由使用者提供）]
+{reference_notes or "(無)"}
 
 [輸出格式要求]
 1) 最終 IG Bio（3 個版本：平衡版 / 強勢版 / 極簡版）
@@ -100,6 +108,7 @@ def build_user_prompt(
 - 避免空泛鼓勵
 - 用可執行、可驗證的語言
 - 若資訊不足，做合理假設並標註
+- 若有提供 URL 但無摘錄內容，先用「待確認事項」列出，不可把 URL 內容當已讀事實
 """
 
     if output_mode == "SKIPE":
@@ -110,6 +119,7 @@ A) Intent Lock (1-2 lines)
 B) Information Architecture (compact bullets)
 C) Shippable Deliverable Blocks (ready-to-paste)
 D) Self-check Summary (pass/warn with one-line reason)
+E) URL Confirmation Block（已確認 / 待確認）
 """
 
     return base_prompt
@@ -185,12 +195,25 @@ if mode == "Quick Planner":
             height=90,
         )
 
+        reference_urls = st.text_area(
+            "參考 URL（每行一個）",
+            placeholder="https://example.com/page1\nhttps://example.com/page2",
+            height=90,
+        )
+        reference_notes = st.text_area(
+            "URL 重點摘錄（可貼下一個分頁讀到的重點）",
+            placeholder="請貼上你已確認的重點，模型才會當成已讀事實。",
+            height=90,
+        )
+
         submitted = st.form_submit_button("產生 Bio + MVP")
 
     if submitted:
         if not core_topics.strip():
             st.warning("請至少填寫「核心主題」，輸出才會更精準。")
         else:
+            if reference_urls.strip() and not reference_notes.strip():
+                st.info("你有提供 URL 但未提供摘錄；輸出將改以「待確認事項」標註，避免臆測內容。")
             system_role, system_rules, max_tokens = build_prompt_mode(output_mode)
             user_prompt = build_user_prompt(
                 creator_identity=creator_identity,
@@ -202,6 +225,8 @@ if mode == "Quick Planner":
                 constraints=constraints,
                 output_mode=output_mode,
                 system_rules=system_rules,
+                reference_urls=reference_urls,
+                reference_notes=reference_notes,
             )
 
             try:
