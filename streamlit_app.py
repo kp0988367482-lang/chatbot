@@ -115,22 +115,22 @@ D) Self-check Summary (pass/warn with one-line reason)
     return base_prompt
 
 
-st.set_page_config(page_title="Creator Strategy Assistant", page_icon="💡", layout="wide")
+st.set_page_config(page_title="創作者策略助手", page_icon="💡", layout="wide")
 
-st.title("💡 Creator Strategy Assistant")
+st.title("💡 創作者策略助手")
 st.write(
-    "Build an IG bio and a focused 4-month MVP content plan for Korea-study/work creators. "
-    "Use **Quick Planner** for structured output, **SKIPE** for deterministic blocks, or **Chat** for free-form conversations."
+    "快速產出 IG Bio 與 4 週 MVP 內容規劃。"
+    "可使用 **快速規劃**（結構化輸出）、**SKIPE**（固定區塊）或 **對話模式**（自由提問）。"
 )
 
-openai_api_key = st.text_input("OpenAI API Key", type="password")
+openai_api_key = st.text_input("OpenAI API 金鑰", type="password")
 
 if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
+    st.info("請先輸入 OpenAI API 金鑰。", icon="🗝️")
     st.stop()
 
 client = OpenAI(api_key=openai_api_key)
-mode = st.radio("Mode", ["Quick Planner", "Chat"], horizontal=True)
+mode = st.radio("模式", ["Quick Planner", "Chat"], horizontal=True)
 
 if "last_result" not in st.session_state:
     st.session_state.last_result = ""
@@ -138,58 +138,58 @@ if "last_language" not in st.session_state:
     st.session_state.last_language = "繁體中文"
 
 if mode == "Quick Planner":
-    st.subheader("IG Bio + MVP Planner")
-    st.caption("Fill only what you know. Leave unknown fields blank.")
+    st.subheader("IG Bio + MVP 規劃")
+    st.caption("只填你目前確定的資訊即可，未知欄位可留空。")
 
     output_mode = st.selectbox(
-        "Output mode",
+        "輸出模式",
         ["Standard", "Low-token", "SKIPE"],
-        help="Standard = full detail, Low-token = compact output, SKIPE = deterministic structured blocks.",
+        help="Standard：完整細節；Low-token：精簡高密度；SKIPE：固定結構區塊。",
     )
 
     with st.form("planner_form"):
         col1, col2 = st.columns(2)
         with col1:
             creator_identity = st.text_input(
-                "Creator identity",
+                "創作者定位",
                 placeholder="e.g. 台灣人視角｜在韓8年｜延世大碩士畢｜韓國在職中",
             )
             core_topics = st.text_area(
-                "Core topics",
+                "核心主題",
                 placeholder="e.g. 韓國簽證、語學堂、研究所、求職、韓文學習、職場文化差異",
                 height=120,
             )
             target_audience = st.text_input(
-                "Target audience",
+                "目標受眾",
                 placeholder="e.g. 想來韓國留學/求職的華語圈用戶",
             )
 
         with col2:
             revenue_goal = st.text_input(
-                "Revenue goal",
+                "營收目標",
                 value="4個月內達成 2,000萬韓幣",
             )
             content_style = st.text_input(
-                "Content style",
+                "內容風格",
                 value="觀點是主角，臉只是載體；可用 AI 圖 + 文字 + 音樂",
             )
             preferred_language = st.selectbox(
-                "Output language",
+                "輸出語言",
                 ["繁體中文", "한국어", "English"],
                 index=0,
             )
 
         constraints = st.text_area(
-            "Constraints / things to avoid",
+            "限制 / 避免事項",
             placeholder="e.g. 先不做 YouTube 長片；只做短影片；避免過度雞湯",
             height=90,
         )
 
-        submitted = st.form_submit_button("Generate Bio + MVP")
+        submitted = st.form_submit_button("產生 Bio + MVP")
 
     if submitted:
         if not core_topics.strip():
-            st.warning("Please provide at least Core topics so the output can be specific.")
+            st.warning("請至少填寫「核心主題」，輸出才會更精準。")
         else:
             system_role, system_rules, max_tokens = build_prompt_mode(output_mode)
             user_prompt = build_user_prompt(
@@ -219,24 +219,24 @@ if mode == "Quick Planner":
                     st.session_state.last_result = result
                     st.session_state.last_language = preferred_language
             except Exception as error:
-                st.error(f"Generation failed: {error}")
+                st.error(f"產生失敗：{error}")
 
     if st.session_state.last_result:
         st.download_button(
-            "Download result (.md)",
+            "下載結果（.md）",
             data=st.session_state.last_result,
             file_name="ig_bio_mvp_plan.md",
             mime="text/markdown",
         )
 
-        st.markdown("### Self-check")
+        st.markdown("### 自我檢查")
         check_results = run_self_check(st.session_state.last_result, st.session_state.last_language)
         for rule_name, status in check_results.items():
             icon = "✅" if status == "pass" else "⚠️"
             st.write(f"{icon} {rule_name}: {status}")
 
 else:
-    st.subheader("Free-form Chat")
+    st.subheader("自由對話")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -245,7 +245,7 @@ else:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Ask about IG bio, short-video strategy, or planning..."):
+    if prompt := st.chat_input("可詢問 IG Bio、短影音策略或內容規劃…"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
